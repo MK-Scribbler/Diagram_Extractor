@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Extractor</title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(120deg, #f0f9ff, #e0ecff);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 2rem;
+    }
+    h1 {
+      font-weight: 800;
+      font-size: 2.5rem;
+      color: #1e3a8a;
+      margin-bottom: 2rem;
+    }
+    .main-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      justify-content: center;
+    }
+    .card-box {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      padding: 2rem;
+      width: 100%;
+      max-width: 450px;
+      transition: transform 0.3s ease;
+    }
+    .card-box:hover {
+      transform: translateY(-5px);
+    }
+    h2 {
+      font-weight: 700;
+      color: #2563eb;
+      margin-bottom: 1rem;
+    }
+    .btn-primary {
+      background-color: #2563eb;
+      border: none;
+      padding: 0.6rem 2rem;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+    .btn-primary:hover {
+      background-color: #1e40af;
+    }
+    .form-group label {
+      font-weight: 600;
+    }
+    .icon-title {
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .icon-title i {
+      font-size: 2rem;
+    }
+    @media (max-width: 768px) {
+      .main-wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<h1>📘 Diagram Scraper</h1>
+
+<div class="main-wrapper">
+
+  <!-- Image Scraper Card -->
+  <div class="card-box">
+    <div class="icon-title mb-3">
+      <i class="fas fa-image text-primary"></i>
+      <h2 class="mb-0">From Website</h2>
+    </div>
+    <form action="/" method="POST">
+      <div class="form-group">
+        <label for="url">Enter the Website URL:</label>
+        <input type="url" class="form-control" id="url" name="url" required placeholder="https://example.com"/>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 mt-3">Scrape Images</button>
+    </form>
+  </div>
+
+  <!-- PDF Upload Card -->
+  <div class="card-box">
+    <div class="icon-title mb-3">
+      <i class="fas fa-file-pdf text-danger"></i>
+      <h2 class="mb-0">From PDF</h2>
+    </div>
+    <form action="/upload_pdf" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="pdf">Upload Biology PDF:</label>
+        <input type="file" class="form-control-file" id="pdf" name="pdf" accept="application/pdf" required/>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 mt-3">Extract Diagrams</button>
+    </form>
+  </div>
+
+</div>
+
+</body>
+</html>

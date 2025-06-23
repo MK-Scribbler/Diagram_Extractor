@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Status Message</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(to right, #e0ecff, #f8fbff);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .card {
+      border-radius: 16px;
+      box-shadow: 0 5px 25px rgba(0, 80, 180, 0.1);
+      padding: 2rem;
+      max-width: 480px;
+      text-align: center;
+    }
+    .card.success {
+      border-left: 6px solid #28a745;
+    }
+    .card.error {
+      border-left: 6px solid #dc3545;
+    }
+    .card h2 {
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #2563eb;
+    }
+    .card p {
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+    .btn-primary {
+      background: #2563eb;
+      border: none;
+      border-radius: 6px;
+      padding: 0.6rem 1.8rem;
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <div class="card {{ status }}">
+    <h2>{{ "Success!" if status == 'success' else "Oops!" }}</h2>
+    <p>{{ message }}</p>
+    <a href="{{ redirect_url }}" class="btn btn-primary">Upload Again</a>
+  </div>
+</body>
+</html>

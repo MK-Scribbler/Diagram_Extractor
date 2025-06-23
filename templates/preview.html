@@ -1,149 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preview Images</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:600,400&display=swap" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #e0ecff 0%, #f8fbff 100%);
-            min-height: 100vh;
-            font-family: 'Montserrat', Arial, sans-serif;
-        }
-        .main-card {
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 4px 24px rgba(0, 80, 180, 0.08);
-            padding: 2.5rem 2rem;
-            margin-top: 2.5rem;
-        }
-        h1 {
-            color: #2563eb;
-            font-weight: 700;
-            letter-spacing: 1px;
-            margin-bottom: 1.5rem;
-        }
-        .card-img-top {
-            border-radius: 12px 12px 0 0;
-            object-fit: cover;
-            height: 180px;
-            cursor: pointer;
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0, 80, 180, 0.06);
-            margin-bottom: 2rem;
-        }
-        .form-check-label {
-            font-size: 1rem;
-            color: #2563eb;
-            font-weight: 500;
-        }
-        .btn-primary {
-            background: #2563eb;
-            border: none;
-            border-radius: 8px;
-            padding: 0.7rem 2.5rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-            transition: background 0.2s;
-        }
-        .btn-primary:hover {
-            background: #1e40af;
-        }
-        .abstract-bg {
-            position: absolute;
-            top: -80px;
-            left: -80px;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle at 60% 40%, #93c5fd 0%, #e0ecff 80%);
-            opacity: 0.5;
-            z-index: 0;
-            border-radius: 50%;
-        }
-        .container {
-            position: relative;
-            z-index: 1;
-        }
-        /* Modal */
-        .modal-img {
-            width: 100%;
-            max-height: 80vh;
-            object-fit: contain;
-        }
-        .modal-content {
-            background-color: #fff;
-            border: none;
-            position: relative;
-            border-radius: 10px;
-            padding: 1rem;
-        }
-        .modal-dialog {
-            max-width: 70vw;
-        }
-        .close-btn {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 2rem;
-            color: #333;
-            background: none;
-            border: none;
-            cursor: pointer;
-        }
-        .close-btn:hover {
-            color: #ff0000;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Preview Images</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"/>
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:600,400&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0ecff 0%, #f8fbff 100%);
+      min-height: 100vh;
+      font-family: 'Montserrat', Arial, sans-serif;
+    }
+    .modal-img {
+      width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+    }
+    .modal-content {
+      background-color: #fff;
+      border: 5px solid transparent;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .modal-dialog {
+      max-width: 75vw;
+    }
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 2rem;
+      color: #333;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .arrow-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2rem;
+      background: rgba(255, 255, 255, 0.7);
+      border: none;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    .arrow-left {
+      left: 10px;
+    }
+    .arrow-right {
+      right: 10px;
+    }
+    .btn-lg {
+      padding: 0.75rem 2rem;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    #finalSlide {
+      display: none;
+      padding: 2rem;
+    }
+    .btn-primary {
+      background: #2563eb;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 2.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
-    <div class="abstract-bg"></div>
-    <div class="container">
-        <div class="main-card">
-            <h1 class="text-center">Preview Extracted Images</h1>
-            <form action="{{ url_for('download_selected') }}" method="post">
-                <div class="row">
-                    {% for img_url in image_urls %}
-                    <div class="col-md-4 col-sm-6">
-                        <div class="card">
-                            <img src="{{ img_url }}" class="card-img-top" alt="Image" data-toggle="modal" data-target="#imgModal" onclick="showModal('{{ img_url }}')">
-                            <div class="card-body text-center">
-                                <input class="form-check-input" type="checkbox" name="selected_images" value="{{ img_url }}">
-                                <label class="form-check-label">
-                                    Keep this image
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                <div class="text-center">
-                    <button type="submit" class="btn btn-primary mt-3">Download Selected Images</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Image Modal -->
-    <div class="modal fade" id="imgModal" tabindex="-1" role="dialog" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <button type="button" class="close-btn" data-dismiss="modal" aria-label="Close">&times;</button>
-                <img id="modalImage" class="modal-img" src="" alt="Expanded Image">
-            </div>
-        </div>
-    </div>
+  <!-- Modal Viewer -->
+  <div class="modal show d-block" id="imgModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <form action="{{ url_for('download_selected') }}" method="post" id="imageForm" class="modal-content">
+        <button type="button" class="close-btn" onclick="window.location.href='/'">&times;</button>
+        <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
+        <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function showModal(src) {
-            document.getElementById('modalImage').src = src;
-        }
-    </script>
+        <!-- Image Slide -->
+        <div id="imageSlide">
+          <p id="imgCounter" class="font-weight-bold mb-2"></p>
+          <img id="modalImage" class="modal-img" src="" alt="Expanded Image" />
+          <div class="mt-4">
+            <button type="button" class="btn btn-success btn-lg mr-3" onclick="markDecision(true)">✅ Yes</button>
+            <button type="button" class="btn btn-danger btn-lg" onclick="markDecision(false)">❌ No</button>
+          </div>
+        </div>
+
+        <!-- Final Slide -->
+        <div id="finalSlide">
+          <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
+          <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
+          <div id="hiddenInputs"></div>
+          <button type="submit" class="btn btn-primary">Submit Selected Images</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script>
+  const imageUrls = {{ image_urls | tojson }};
+  const selections = {}; // Store yes/no decisions
+  let currentIndex = 0;
+
+  document.addEventListener('DOMContentLoaded', updateModal);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') navigate(1);
+    if (e.key === 'ArrowLeft') navigate(-1);
+  });
+
+  function markDecision(isYes) {
+    selections[currentIndex] = isYes;
+
+    // ✅ Immediately update border color
+    const form = document.getElementById('imageForm');
+    form.style.borderColor = isYes ? '#28a745' : '#dc3545';
+
+    // ⏳ Navigate after a brief delay
+    setTimeout(() => {
+      navigate(1);
+    }, 300);
+  }
+
+  function updateModal() {
+    const isFinal = currentIndex >= imageUrls.length;
+
+    document.getElementById('imageSlide').style.display = isFinal ? 'none' : 'block';
+    document.getElementById('finalSlide').style.display = isFinal ? 'block' : 'none';
+
+    const form = document.getElementById('imageForm');
+    if (!isFinal) {
+      document.getElementById('modalImage').src = imageUrls[currentIndex];
+      document.getElementById('imgCounter').textContent = `Image ${currentIndex + 1} of ${imageUrls.length}`;
+
+      // ✅ Restore border state
+      const decision = selections[currentIndex];
+      form.style.borderColor = decision === true ? '#28a745'
+                            : decision === false ? '#dc3545'
+                            : 'transparent';
+    } else {
+      form.style.borderColor = 'transparent';
+      generateSelectedInputs();
+    }
+  }
+
+  function navigate(dir) {
+    currentIndex += dir;
+    if (currentIndex < 0) currentIndex = 0;
+    if (currentIndex > imageUrls.length) currentIndex = imageUrls.length;
+    updateModal();
+  }
+
+  function generateSelectedInputs() {
+    const container = document.getElementById('hiddenInputs');
+    container.innerHTML = "";
+    for (let i = 0; i < imageUrls.length; i++) {
+      if (selections[i]) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_images';
+        input.value = imageUrls[i].replace('/static/', '');
+        container.appendChild(input);
+      }
+    }
+  }
+</script>
+
 </body>
 </html>

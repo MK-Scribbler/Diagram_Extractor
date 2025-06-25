@@ -79,11 +79,19 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
       <form action="{{ url_for('download_selected') }}" method="post" id="imageForm" class="modal-content">
         <button type="button" class="close-btn" onclick="window.location.href='/'">&times;</button>
-        <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
-        <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
+
+        <!-- Error Slide -->
+        <div id="errorSlide" style="display: none;">
+          <h4 class="mb-4 text-danger">⚠️ No diagrams extracted!</h4>
+          <p class="text-muted mb-4">Please check your input or try a different website or PDF.</p>
+          <button type="button" class="btn btn-primary" onclick="window.location.href='{{ url_for('index') }}'">Back to Home</button>
+        </div>
 
         <!-- Image Slide -->
         <div id="imageSlide">
+          <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
+          <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
+
           <p id="imgCounter" class="font-weight-bold mb-2"></p>
           <img id="modalImage" class="modal-img" src="" alt="Expanded Image" />
           <div class="mt-4">
@@ -93,7 +101,7 @@
         </div>
 
         <!-- Final Slide -->
-        <div id="finalSlide">
+        <div id="finalSlide" style="display: none;">
           <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
           <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
           <div id="hiddenInputs"></div>
@@ -102,7 +110,6 @@
       </form>
     </div>
   </div>
-
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script>
@@ -111,6 +118,14 @@
   let currentIndex = 0;
 
   window.onload = () => {
+    if (imageUrls.length === 0) {
+      // Show error screen only
+      document.getElementById('errorSlide').style.display = 'block';
+      document.getElementById('imageSlide').style.display = 'none';
+      document.getElementById('finalSlide').style.display = 'none';
+      return;
+    }
+
     updateModal();
 
     document.addEventListener('keydown', e => {
@@ -135,7 +150,7 @@
     const form = document.getElementById('imageForm');
     if (!isFinal) {
       const img = document.getElementById('modalImage');
-      img.style.opacity = 0; // hide image while loading
+      img.style.opacity = 0;
       img.onload = () => img.style.opacity = 1;
 
       img.src = imageUrls[currentIndex];

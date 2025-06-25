@@ -59,7 +59,6 @@ def index():
     return render_template('index.html')
 
 
-
 @app.route('/', methods=['POST'])
 def scrape_images():
     url = request.form.get('url')
@@ -120,7 +119,6 @@ def scrape_images():
     # Preview all saved images
     image_urls = [url_for('static', filename=f'diagrams_web_filtered/{img}') for img in sorted(os.listdir(WEB_OUTPUT_FOLDER))]
     return render_template('preview.html', image_urls=image_urls)
-
 
 
 @app.route('/upload_pdf', methods=['POST'])

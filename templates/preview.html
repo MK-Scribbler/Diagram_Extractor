@@ -105,29 +105,25 @@
 
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-  <script>
-  const imageUrls = {{ image_urls | tojson }};
-  const selections = {}; // Store yes/no decisions
+<script>
+  const imageUrls = {{ image_urls | tojson | safe }};
+  const selections = {};
   let currentIndex = 0;
 
-  document.addEventListener('DOMContentLoaded', updateModal);
+  window.onload = () => {
+    updateModal();
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowRight') navigate(1);
-    if (e.key === 'ArrowLeft') navigate(-1);
-  });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') navigate(1);
+      if (e.key === 'ArrowLeft') navigate(-1);
+    });
+  };
 
   function markDecision(isYes) {
     selections[currentIndex] = isYes;
-
-    // ✅ Immediately update border color
     const form = document.getElementById('imageForm');
     form.style.borderColor = isYes ? '#28a745' : '#dc3545';
-
-    // ⏳ Navigate after a brief delay
-    setTimeout(() => {
-      navigate(1);
-    }, 300);
+    setTimeout(() => navigate(1), 300);
   }
 
   function updateModal() {
@@ -138,10 +134,13 @@
 
     const form = document.getElementById('imageForm');
     if (!isFinal) {
-      document.getElementById('modalImage').src = imageUrls[currentIndex];
+      const img = document.getElementById('modalImage');
+      img.style.opacity = 0; // hide image while loading
+      img.onload = () => img.style.opacity = 1;
+
+      img.src = imageUrls[currentIndex];
       document.getElementById('imgCounter').textContent = `Image ${currentIndex + 1} of ${imageUrls.length}`;
 
-      // ✅ Restore border state
       const decision = selections[currentIndex];
       form.style.borderColor = decision === true ? '#28a745'
                             : decision === false ? '#dc3545'
@@ -174,5 +173,7 @@
   }
 </script>
 
+
 </body>
 </html>
+

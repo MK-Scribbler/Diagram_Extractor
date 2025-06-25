@@ -9,9 +9,15 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from tempfile import mkdtemp
+from PIL import Image
+import io
 from ultralytics import YOLO
 import time
+from pdf2image import convert_from_path
 
 app = Flask(__name__)
 
@@ -52,6 +58,8 @@ def iou(boxA, boxB):
 def index():
     return render_template('index.html')
 
+
+
 @app.route('/', methods=['POST'])
 def scrape_images():
     url = request.form.get('url')
@@ -61,6 +69,7 @@ def scrape_images():
     shutil.rmtree(WEB_OUTPUT_FOLDER, ignore_errors=True)
     os.makedirs(WEB_OUTPUT_FOLDER, exist_ok=True)
 
+    # Headless browser setup
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
@@ -68,6 +77,7 @@ def scrape_images():
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
     driver.get(url)
 
+    # Scroll to load lazy images
     total_height = driver.execute_script("return document.body.scrollHeight")
     for pos in range(0, total_height, 800):
         driver.execute_script(f"window.scrollTo(0, {pos});")
@@ -79,6 +89,7 @@ def scrape_images():
     soup = BeautifulSoup(html, "html.parser")
     img_tags = soup.find_all("img")
 
+    # Best image URL resolver
     def get_best_src(tag):
         srcset = tag.get("srcset")
         if srcset:
@@ -94,45 +105,85 @@ def scrape_images():
             full_url = urljoin(url, src.strip())
             image_urls.append(full_url)
 
-    saved_boxes = []
     count = 1
-    tmp_dir = mkdtemp()
-
     for img_url in image_urls:
         try:
             img_data = requests.get(img_url, timeout=5).content
             ext = os.path.splitext(urlparse(img_url).path)[-1] or ".jpg"
-            img_path = os.path.join(tmp_dir, f"img_{count}{ext}")
-            with open(img_path, "wb") as f:
+            out_path = os.path.join(WEB_OUTPUT_FOLDER, f"{count}{ext}")
+            with open(out_path, "wb") as f:
                 f.write(img_data)
-
-            image = cv2.imread(img_path)
-            if image is None:
-                continue
-
-            result = model.predict(image, verbose=False)[0]
-            if not result.boxes:
-                continue
-
-            for box in result.boxes:
-                conf = float(box.conf[0])
-                if conf < CONFIDENCE_THRESHOLD:
-                    continue
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                this_box = (x1, y1, x2, y2)
-                if all(iou(this_box, b) < IOU_THRESHOLD for b in saved_boxes):
-                    cropped = image[y1:y2, x1:x2]
-                    cropped = cv2.resize(cropped, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-                    out_path = os.path.join(WEB_OUTPUT_FOLDER, f"{count}.jpg")
-                    cv2.imwrite(out_path, cropped)
-                    saved_boxes.append(this_box)
-                    count += 1
-
+            count += 1
         except Exception as e:
-            print(f"Error processing {img_url}: {e}")
+            print(f"Error downloading {img_url}: {e}")
 
-    shutil.rmtree(tmp_dir)
+    # Preview all saved images
     image_urls = [url_for('static', filename=f'diagrams_web_filtered/{img}') for img in sorted(os.listdir(WEB_OUTPUT_FOLDER))]
+    return render_template('preview.html', image_urls=image_urls)
+
+
+
+@app.route('/upload_pdf', methods=['POST'])
+def upload_pdf():
+    pdf_file = request.files.get('pdf')
+    if not pdf_file:
+        return redirect(url_for('index'))
+
+    saved_boxes = []
+    count = 1
+
+    shutil.rmtree(PDF_OUTPUT_FOLDER, ignore_errors=True)
+    os.makedirs(PDF_OUTPUT_FOLDER, exist_ok=True)
+
+    pdf_path = os.path.join(UPLOAD_FOLDER, pdf_file.filename)
+    pdf_file.save(pdf_path)
+
+    pages = convert_from_path(pdf_path, dpi=300, poppler_path=POPPLER_PATH)
+    for idx, page in enumerate(pages):
+        page_path = os.path.join(UPLOAD_FOLDER, f"page_{idx+1}.jpg")
+        page.save(page_path)
+        image = cv2.imread(page_path)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        _, thresh = cv2.threshold(blur, 200, 255, cv2.THRESH_BINARY_INV)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+        morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+        contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            area = w * h
+            if area < 60000 or area > 0.9 * image.shape[0] * image.shape[1]:
+                continue
+
+            x1 = max(0, x - PADDING)
+            y1 = max(0, y - PADDING)
+            x2 = min(image.shape[1], x + w + PADDING)
+            y2 = min(image.shape[0], y + h + PADDING)
+            cropped = image[y1:y2, x1:x2]
+
+            result = model.predict(cropped, verbose=False)[0]
+            if not result.boxes or len(result.boxes) == 0:
+                continue
+
+            conf = float(result.boxes[0].conf[0])
+            if conf < CONFIDENCE_THRESHOLD:
+                continue
+
+            this_box = (x1, y1, x2, y2)
+            if any(iou(this_box, b) > IOU_THRESHOLD for b in saved_boxes):
+                continue
+
+            out_path = os.path.join(PDF_OUTPUT_FOLDER, f"{count}.jpg")
+            cv2.imwrite(out_path, cropped)
+            saved_boxes.append(this_box)
+            count += 1
+
+        os.remove(page_path)
+
+    image_urls = [url_for('static', filename=f'diagrams_pdf_filtered/{img}') for img in sorted(os.listdir(PDF_OUTPUT_FOLDER))]
     return render_template('preview.html', image_urls=image_urls)
 
 

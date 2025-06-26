@@ -18,6 +18,7 @@ import io
 from ultralytics import YOLO
 import time
 from pdf2image import convert_from_path
+import base64
 
 app = Flask(__name__)
 
@@ -204,11 +205,25 @@ def download_selected():
 
     # Step 2: Copy images with new names in sequential order
     added = False
-    for relative_path in selected:
+    for idx, relative_path in enumerate(selected):
         src = os.path.join('static', relative_path)
         ext = os.path.splitext(relative_path)[-1]  # Preserve original extension (e.g., .jpg, .png)
         dst = os.path.join(extracted_dir, f"{next_number}{ext}")
 
+        # Check for cropped image data
+        cropped_key = f"cropped_image_data_{idx}"
+        cropped_data = request.form.get(cropped_key)
+        if cropped_data and cropped_data.startswith("data:image"):
+            # Save the cropped image
+            header, encoded = cropped_data.split(",", 1)
+            img_bytes = base64.b64decode(encoded)
+            with open(dst, "wb") as f:
+                f.write(img_bytes)
+            added = True
+            next_number += 1
+            continue
+
+        # Otherwise, copy the original
         if os.path.abspath(src) == os.path.abspath(dst):
             continue
         if os.path.exists(src):

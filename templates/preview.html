@@ -6,11 +6,13 @@
   <title>Preview Images</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"/>
   <link href="https://fonts.googleapis.com/css?family=Montserrat:600,400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
   <style>
     body {
       background: linear-gradient(135deg, #e0ecff 0%, #f8fbff 100%);
       min-height: 100vh;
       font-family: 'Montserrat', Arial, sans-serif;
+      overflow-y: auto;
     }
     .modal-img {
       width: 100%;
@@ -23,9 +25,54 @@
       border-radius: 10px;
       padding: 1rem;
       text-align: center;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
     }
     .modal-dialog {
       max-width: 75vw;
+      margin: 1.75rem auto;
+    }
+    .cropper-container {
+      max-height: 70vh !important;
+      overflow: hidden;
+    }
+    #buttonRow {
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 15px;
+      justify-content: center;
+      position: relative;
+      z-index: 100;
+    }
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 5px;
+    }
+    .arrow-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2rem;
+      background: rgba(255, 255, 255, 0.8);
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1050;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .arrow-left {
+      left: 20px;
+    }
+    .arrow-right {
+      right: 20px;
     }
     .close-btn {
       position: absolute;
@@ -36,27 +83,7 @@
       background: none;
       border: none;
       cursor: pointer;
-    }
-    .arrow-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 2rem;
-      background: rgba(255, 255, 255, 0.7);
-      border: none;
-      padding: 0.5rem 1rem;
-      cursor: pointer;
-    }
-    .arrow-left {
-      left: 10px;
-    }
-    .arrow-right {
-      right: 10px;
-    }
-    .btn-lg {
-      padding: 0.75rem 2rem;
-      font-size: 1.2rem;
-      font-weight: 600;
+      z-index: 1050;
     }
     #finalSlide {
       display: none;
@@ -70,6 +97,14 @@
       font-size: 1.1rem;
       font-weight: 600;
     }
+    .cropper-mode .arrow-btn {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    #confirmCropBtn {
+      margin: 5px;
+      z-index: 1050;
+    }
   </style>
 </head>
 <body>
@@ -79,29 +114,25 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
       <form action="{{ url_for('download_selected') }}" method="post" id="imageForm" class="modal-content">
         <button type="button" class="close-btn" onclick="window.location.href='/'">&times;</button>
-
-        <!-- Error Slide -->
-        <div id="errorSlide" style="display: none;">
-          <h4 class="mb-4 text-danger">⚠️ No diagrams extracted!</h4>
-          <p class="text-muted mb-4">Please check your input or try a different website or PDF.</p>
-          <button type="button" class="btn btn-primary" onclick="window.location.href='{{ url_for('index') }}'">Back to Home</button>
-        </div>
+        <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
+        <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
 
         <!-- Image Slide -->
         <div id="imageSlide">
-          <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
-          <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
-
           <p id="imgCounter" class="font-weight-bold mb-2"></p>
+          <!-- Add this below your #imgCounter in the modal -->
+          <p id="cropMsg" class="text-info font-weight-bold mb-2" style="display:none;">DRAG TO CROP</p>
           <img id="modalImage" class="modal-img" src="" alt="Expanded Image" />
-          <div class="mt-4">
+          <div class="mt-4 d-flex justify-content-center flex-wrap" id="buttonRow">
             <button type="button" class="btn btn-success btn-lg mr-3" onclick="markDecision(true)">✅ Yes</button>
-            <button type="button" class="btn btn-danger btn-lg" onclick="markDecision(false)">❌ No</button>
+            <button type="button" class="btn btn-danger btn-lg mr-3" onclick="markDecision(false)">❌ No</button>
+            <button type="button" class="btn btn-warning btn-lg mr-3" onclick="startCrop()">✂️ Crop</button>
+            <!-- Confirm Crop button will be injected here -->
           </div>
         </div>
 
         <!-- Final Slide -->
-        <div id="finalSlide" style="display: none;">
+        <div id="finalSlide">
           <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
           <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
           <div id="hiddenInputs"></div>
@@ -110,22 +141,19 @@
       </form>
     </div>
   </div>
+
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
   const imageUrls = {{ image_urls | tojson | safe }};
   const selections = {};
   let currentIndex = 0;
+  let cropper = null;
+  const originalImages = {}; // Store original images for undo
+  const croppedImages = {};  // Store cropped images as DataURL
 
   window.onload = () => {
-    if (imageUrls.length === 0) {
-      // Show error screen only
-      document.getElementById('errorSlide').style.display = 'block';
-      document.getElementById('imageSlide').style.display = 'none';
-      document.getElementById('finalSlide').style.display = 'none';
-      return;
-    }
-
     updateModal();
 
     document.addEventListener('keydown', e => {
@@ -153,16 +181,30 @@
       img.style.opacity = 0;
       img.onload = () => img.style.opacity = 1;
 
-      img.src = imageUrls[currentIndex];
+      // Show cropped image if exists, else original
+      if (croppedImages[currentIndex]) {
+        img.src = croppedImages[currentIndex];
+      } else {
+        img.src = imageUrls[currentIndex];
+      }
       document.getElementById('imgCounter').textContent = `Image ${currentIndex + 1} of ${imageUrls.length}`;
 
       const decision = selections[currentIndex];
       form.style.borderColor = decision === true ? '#28a745'
                             : decision === false ? '#dc3545'
                             : 'transparent';
+
+      // Destroy cropper if navigating
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+        removeConfirmCropBtn();
+        removeUndoCropBtn();
+      }
     } else {
       form.style.borderColor = 'transparent';
       generateSelectedInputs();
+      generateCroppedInputs();
     }
   }
 
@@ -186,9 +228,139 @@
       }
     }
   }
+
+  // Add this function to generate hidden cropped image inputs for submission
+  function generateCroppedInputs() {
+    // Remove old cropped inputs
+    document.querySelectorAll('input[name^="cropped_image_data_"]').forEach(el => el.remove());
+    // Only add cropped inputs for selected images, and keep the index in selected_images order
+    let selectedIdx = 0;
+    for (let i = 0; i < imageUrls.length; i++) {
+      if (selections[i]) {
+        if (croppedImages[i]) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = `cropped_image_data_${selectedIdx}`;
+          input.value = croppedImages[i];
+          document.getElementById('imageForm').appendChild(input);
+        }
+        selectedIdx++;
+      }
+    }
+  }
+
+  // --- Cropper.js integration ---
+  function startCrop() {
+    const img = document.getElementById('modalImage');
+    const form = document.getElementById('imageForm');
+    form.classList.add('cropper-mode');
+
+    // Show crop message
+    document.getElementById('cropMsg').style.display = 'block';
+
+    // Save the currently displayed image (could be cropped) for undo
+    if (!originalImages[currentIndex]) {
+      originalImages[currentIndex] = img.src;
+    }
+
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+      removeConfirmCropBtn();
+      removeUndoCropBtn();
+    }
+    cropper = new Cropper(img, {
+      viewMode: 0, // Show full image, allow cropping from any area
+      autoCrop: false, // Do not show crop box by default
+      movable: true,
+      zoomable: true,
+      scalable: true,
+      cropBoxResizable: true,
+      responsive: true,
+      restore: false,
+      ready() {
+        addConfirmCropBtn();
+        addUndoCropBtn();
+        const cropperContainer = document.querySelector('.cropper-container');
+        if (cropperContainer) {
+          cropperContainer.style.maxHeight = '70vh';
+          cropperContainer.style.zIndex = '1000';
+        }
+      }
+    });
+  }
+
+  function addConfirmCropBtn() {
+    removeConfirmCropBtn();
+    const btnRow = document.getElementById('buttonRow');
+    const btn = document.createElement('button');
+    btn.id = 'confirmCropBtn';
+    btn.type = 'button';
+    btn.className = 'btn btn-info btn-lg';
+    btn.textContent = '✓ Confirm Crop';
+    btn.onclick = confirmCrop;
+    btnRow.appendChild(btn);
+  }
+
+  function removeConfirmCropBtn() {
+    const btn = document.getElementById('confirmCropBtn');
+    if (btn) btn.remove();
+  }
+
+  function addUndoCropBtn() {
+    removeUndoCropBtn();
+    const btnRow = document.getElementById('buttonRow');
+    const btn = document.createElement('button');
+    btn.id = 'undoCropBtn';
+    btn.type = 'button';
+    btn.className = 'btn btn-secondary btn-lg';
+    btn.textContent = '↩️ Undo';
+    btn.onclick = undoCrop;
+    btnRow.appendChild(btn);
+  }
+
+  function removeUndoCropBtn() {
+    const btn = document.getElementById('undoCropBtn');
+    if (btn) btn.remove();
+  }
+
+  function undoCrop() {
+    document.getElementById('modalImage').src = originalImages[currentIndex] || imageUrls[currentIndex];
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+    removeConfirmCropBtn();
+    removeUndoCropBtn();
+    const form = document.getElementById('imageForm');
+    form.classList.remove('cropper-mode');
+    // Hide crop message
+    document.getElementById('cropMsg').style.display = 'none';
+    // Remove cropped image from memory and hidden input
+    delete croppedImages[currentIndex];
+    const input = document.querySelector(`input[name="cropped_image_data_${currentIndex}"]`);
+    if (input) input.remove();
+  }
+
+  function confirmCrop() {
+    if (cropper) {
+      const canvas = cropper.getCroppedCanvas();
+      if (canvas) {
+        const dataUrl = canvas.toDataURL();
+        document.getElementById('modalImage').src = dataUrl;
+        croppedImages[currentIndex] = dataUrl;
+        generateCroppedInputs();
+      }
+      cropper.destroy();
+      cropper = null;
+      removeConfirmCropBtn();
+      removeUndoCropBtn();
+      const form = document.getElementById('imageForm');
+      form.classList.remove('cropper-mode');
+      // Hide crop message
+      document.getElementById('cropMsg').style.display = 'none';
+    }
+  }
 </script>
-
-
 </body>
 </html>
-

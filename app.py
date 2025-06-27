@@ -21,6 +21,7 @@ from pdf2image import convert_from_path
 import base64
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 200MB, adjust as needed
 
 # === Config ===
 UPLOAD_FOLDER = 'uploads'
@@ -31,6 +32,8 @@ MODEL_PATH = "best.pt"
 CONFIDENCE_THRESHOLD = 0.6
 IOU_THRESHOLD = 0.8
 PADDING = 25
+
+
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(WEB_OUTPUT_FOLDER, exist_ok=True)
@@ -121,6 +124,13 @@ def scrape_images():
     image_urls = [url_for('static', filename=f'diagrams_web_filtered/{img}') for img in sorted(os.listdir(WEB_OUTPUT_FOLDER))]
     return render_template('preview.html', image_urls=image_urls)
 
+from werkzeug.exceptions import RequestEntityTooLarge
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_large_file(e):
+    return render_template("message.html", status="error",
+        message="⚠️ The file is too large. Maximum allowed size is 1GB.",
+        redirect_url=url_for('index')), 413
 
 @app.route('/upload_pdf', methods=['POST'])
 def upload_pdf():
@@ -236,6 +246,43 @@ def download_selected():
 
     return render_template("message.html", status="success", message="✅ Selected images saved in order!", redirect_url=url_for('index'))
 
+@app.route('/upload_folder', methods=['POST'])
+def upload_folder():
+    files = request.files.getlist('images')
+    if not files:
+        return redirect(url_for('index'))
+
+    # Clean and prepare a folder for these images
+    FOLDER_UPLOAD_OUTPUT = 'static/diagrams_folder_filtered'
+    shutil.rmtree(FOLDER_UPLOAD_OUTPUT, ignore_errors=True)
+    os.makedirs(FOLDER_UPLOAD_OUTPUT, exist_ok=True)
+
+    count = 1
+    for file in files:
+        filename = file.filename
+        ext = os.path.splitext(filename)[-1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']:
+            out_path = os.path.join(FOLDER_UPLOAD_OUTPUT, f"{count}{ext}")
+            file.save(out_path)
+            count += 1
+
+    # Prepare image URLs for preview.html
+    image_urls = [url_for('static', filename=f'diagrams_folder_filtered/{img}') for img in sorted(os.listdir(FOLDER_UPLOAD_OUTPUT))]
+    return render_template('preview.html', image_urls=image_urls)
+
+@app.route('/test_upload', methods=['GET', 'POST'])
+def test_upload():
+    if request.method == 'POST':
+        files = request.files.getlist('images')
+        total_size = sum(len(file.read()) for file in files)
+        print("Total upload size:", total_size)
+        return f"Received {len(files)} files, total size: {total_size} bytes"
+    return '''
+    <form method="post" enctype="multipart/form-data">
+      <input type="file" name="images" webkitdirectory directory multiple>
+      <button type="submit">Upload</button>
+    </form>
+    '''
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,port=8080)

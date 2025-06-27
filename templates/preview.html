@@ -254,11 +254,8 @@
     const img = document.getElementById('modalImage');
     const form = document.getElementById('imageForm');
     form.classList.add('cropper-mode');
-
-    // Show crop message
     document.getElementById('cropMsg').style.display = 'block';
 
-    // Save the currently displayed image (could be cropped) for undo
     if (!originalImages[currentIndex]) {
       originalImages[currentIndex] = img.src;
     }
@@ -268,10 +265,11 @@
       cropper = null;
       removeConfirmCropBtn();
       removeUndoCropBtn();
+      removeCropperControls(); // <-- Ensure controls are removed before adding
     }
     cropper = new Cropper(img, {
-      viewMode: 0, // Show full image, allow cropping from any area
-      autoCrop: false, // Do not show crop box by default
+      viewMode: 0,
+      autoCrop: false,
       movable: true,
       zoomable: true,
       scalable: true,
@@ -281,6 +279,7 @@
       ready() {
         addConfirmCropBtn();
         addUndoCropBtn();
+        addCropperControls(); // <-- Only add controls here
         const cropperContainer = document.querySelector('.cropper-container');
         if (cropperContainer) {
           cropperContainer.style.maxHeight = '70vh';
@@ -324,6 +323,58 @@
     if (btn) btn.remove();
   }
 
+  function addCropperControls() {
+    removeCropperControls();
+    const btnRow = document.getElementById('buttonRow');
+
+    // Zoom In
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.type = 'button';
+    zoomInBtn.className = 'btn btn-light btn-lg';
+    zoomInBtn.innerHTML = '＋';
+    zoomInBtn.title = 'Zoom In';
+    zoomInBtn.onclick = () => cropper && cropper.zoom(0.1);
+    zoomInBtn.id = 'zoomInBtn';
+    btnRow.appendChild(zoomInBtn);
+
+    // Zoom Out
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.type = 'button';
+    zoomOutBtn.className = 'btn btn-light btn-lg';
+    zoomOutBtn.innerHTML = '－';
+    zoomOutBtn.title = 'Zoom Out';
+    zoomOutBtn.onclick = () => cropper && cropper.zoom(-0.1);
+    zoomOutBtn.id = 'zoomOutBtn';
+    btnRow.appendChild(zoomOutBtn);
+
+    // Move Up
+    const moveUpBtn = document.createElement('button');
+    moveUpBtn.type = 'button';
+    moveUpBtn.className = 'btn btn-light btn-lg';
+    moveUpBtn.innerHTML = '↑';
+    moveUpBtn.title = 'Move Up';
+    moveUpBtn.onclick = () => cropper && cropper.move(0, -20);
+    moveUpBtn.id = 'moveUpBtn';
+    btnRow.appendChild(moveUpBtn);
+
+    // Move Down
+    const moveDownBtn = document.createElement('button');
+    moveDownBtn.type = 'button';
+    moveDownBtn.className = 'btn btn-light btn-lg';
+    moveDownBtn.innerHTML = '↓';
+    moveDownBtn.title = 'Move Down';
+    moveDownBtn.onclick = () => cropper && cropper.move(0, 20);
+    moveDownBtn.id = 'moveDownBtn';
+    btnRow.appendChild(moveDownBtn);
+  }
+
+  function removeCropperControls() {
+    ['zoomInBtn', 'zoomOutBtn', 'moveUpBtn', 'moveDownBtn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.remove();
+    });
+  }
+
   function undoCrop() {
     document.getElementById('modalImage').src = originalImages[currentIndex] || imageUrls[currentIndex];
     if (cropper) {
@@ -332,9 +383,9 @@
     }
     removeConfirmCropBtn();
     removeUndoCropBtn();
+    removeCropperControls(); // <-- Remove controls after undo
     const form = document.getElementById('imageForm');
     form.classList.remove('cropper-mode');
-    // Hide crop message
     document.getElementById('cropMsg').style.display = 'none';
     // Remove cropped image from memory and hidden input
     delete croppedImages[currentIndex];
@@ -344,9 +395,15 @@
 
   function confirmCrop() {
     if (cropper) {
-      const canvas = cropper.getCroppedCanvas();
+      const canvas = cropper.getCroppedCanvas({
+        // Resize the cropped image to a max width/height (e.g., 800px)
+        maxWidth: 800,
+        maxHeight: 800,
+        imageSmoothingQuality: 'high'
+      });
       if (canvas) {
-        const dataUrl = canvas.toDataURL();
+        // Compress to JPEG with quality 0.7 (adjust as needed)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         document.getElementById('modalImage').src = dataUrl;
         croppedImages[currentIndex] = dataUrl;
         generateCroppedInputs();
@@ -355,12 +412,14 @@
       cropper = null;
       removeConfirmCropBtn();
       removeUndoCropBtn();
+      removeCropperControls();
       const form = document.getElementById('imageForm');
       form.classList.remove('cropper-mode');
-      // Hide crop message
       document.getElementById('cropMsg').style.display = 'none';
     }
   }
+
+
 </script>
 </body>
 </html>

@@ -113,7 +113,32 @@
     </form>
   </div>
 
+  <!-- Image Folder Upload Card -->
+  <div class="card-box">
+    <div class="icon-title mb-3">
+      <i class="fas fa-folder-open text-success"></i>
+      <h2 class="mb-0">Clean Data</h2>
+    </div>
+    <form action="{{ url_for('upload_folder') }}" method="post" enctype="multipart/form-data" class="mb-4">
+      <label for="imageInput" class="font-weight-bold">Select Images:</label>
+      <input type="file" id="imageInput" name="images" multiple required class="form-control-file mt-2 mb-2" accept="image/*">
+      <button type="submit" class="btn btn-primary">Upload Images</button>
+    </form>
+  </div>
+
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const folderInput = document.getElementById('folderInput');
+  const form = folderInput && folderInput.form;
+  if (form && folderInput) {
+    form.addEventListener('submit', function() {
+      setTimeout(() => { folderInput.value = ''; }, 1000); // reset after submit
+    });
+  }
+});
+</script>
 
 </body>
 </html>

@@ -92,7 +92,7 @@
     <form action="/" method="POST">
       <div class="form-group">
         <label for="url">Enter the Website URL:</label>
-        <input type="url" class="form-control" id="url" name="url" required placeholder="https://example.com"/>
+        <input type="text" class="form-control" id="url" name="url" required placeholder="https://example.com"/>
       </div>
       <button type="submit" class="btn btn-primary w-100 mt-3">Scrape Images</button>
     </form>
@@ -124,19 +124,33 @@
       <input type="file" id="imageInput" name="images" multiple required class="form-control-file mt-2 mb-2" accept="image/*">
       <button type="submit" class="btn btn-primary">Upload Images</button>
     </form>
+    <div id="sizeWarning" style="display:none;color:#d9534f;font-weight:bold;margin-top:10px;"></div>
   </div>
 
 </div>
 
 <script>
+const MAX_SIZE_MB = 1024; // 1GB (change to match your Flask config)
+const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
 document.addEventListener('DOMContentLoaded', function() {
-  const folderInput = document.getElementById('folderInput');
-  const form = folderInput && folderInput.form;
-  if (form && folderInput) {
-    form.addEventListener('submit', function() {
-      setTimeout(() => { folderInput.value = ''; }, 1000); // reset after submit
-    });
-  }
+  const form = document.querySelector('form[action="{{ url_for('upload_folder') }}"]');
+  if (!form) return;
+  const fileInput = form.querySelector('input[type="file"]');
+  const warning = document.getElementById('sizeWarning');
+  form.addEventListener('submit', function(e) {
+    let totalSize = 0;
+    for (let file of fileInput.files) {
+      totalSize += file.size;
+    }
+    if (totalSize > MAX_SIZE_BYTES) {
+      e.preventDefault();
+      warning.style.display = 'block';
+      warning.textContent = `Total upload size exceeds ${MAX_SIZE_MB} MB. Please select smaller files.`;
+    } else {
+      warning.style.display = 'none';
+    }
+  });
 });
 </script>
 

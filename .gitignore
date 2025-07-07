@@ -1,0 +1,6 @@
+# Ignore generated and temporary image folders
+static/diagrams_web_filtered/
+static/diagrams_pdf_filtered/
+static/diagrams_folder_filtered/
+results/Diagrams_Extracted/
+uploads/

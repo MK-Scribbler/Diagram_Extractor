@@ -109,10 +109,28 @@
 </head>
 <body>
 
+  {% if not image_urls or image_urls|length == 0 %}
+  <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
+    <div class="modal-content text-center p-5" style="max-width: 400px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+      <div class="mb-3">
+        <span style="font-size:2.5rem; color:#ff9800;">&#9888;</span>
+      </div>
+      <h4 class="mb-3 text-warning font-weight-bold">No Images Detected</h4>
+      <p class="text-muted mb-4" style="font-size:1.1rem;">
+        Sorry, no images were found or extracted from the provided source.
+      </p>
+      <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg px-4">Go Back</a>
+    </div>
+  </div>
+  {% else %}
   <!-- Modal Viewer -->
   <div class="modal show d-block" id="imgModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
       <form action="{{ url_for('download_selected') }}" method="post" id="imageForm" class="modal-content">
+        {% if clean_local %}
+          <input type="hidden" name="clean_local" value="1">
+        {% endif %}
+
         <button type="button" class="close-btn" onclick="window.location.href='/'">&times;</button>
         <button type="button" class="arrow-btn arrow-left" onclick="navigate(-1)">&lt;</button>
         <button type="button" class="arrow-btn arrow-right" onclick="navigate(1)">&gt;</button>
@@ -120,14 +138,12 @@
         <!-- Image Slide -->
         <div id="imageSlide">
           <p id="imgCounter" class="font-weight-bold mb-2"></p>
-          <!-- Add this below your #imgCounter in the modal -->
           <p id="cropMsg" class="text-info font-weight-bold mb-2" style="display:none;">DRAG TO CROP</p>
           <img id="modalImage" class="modal-img" src="" alt="Expanded Image" />
           <div class="mt-4 d-flex justify-content-center flex-wrap" id="buttonRow">
-            <button type="button" class="btn btn-success btn-lg mr-3" onclick="markDecision(true)">✅ Yes</button>
+            <button type="button" class="btn btn-success btn-lg mr-3" id="yesBtn" onclick="markDecision(true)">✅ Yes</button>
             <button type="button" class="btn btn-danger btn-lg mr-3" onclick="markDecision(false)">❌ No</button>
             <button type="button" class="btn btn-warning btn-lg mr-3" onclick="startCrop()">✂️ Crop</button>
-            <!-- Confirm Crop button will be injected here -->
           </div>
         </div>
 
@@ -136,11 +152,24 @@
           <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
           <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
           <div id="hiddenInputs"></div>
-          <button type="submit" class="btn btn-primary">Submit Selected Images</button>
+          {% if not clean_local %}
+          <button type="submit" class="btn btn-primary" id="submitBtn">Submit Selected Images</button>
+          {% endif %}
         </div>
+
+        {% for original_url in image_urls %}
+        <input type="hidden" name="original_url_{{ loop.index0 }}" value="{{ original_url }}">
+        {% endfor %}
+
+        {% for idx in range(image_urls|length) %}
+          <input type="hidden" name="source_{{ idx }}" value="{{ sources[idx] }}">
+        {% endfor %}
+
+
       </form>
     </div>
   </div>
+  {% endif %}
 
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
@@ -152,6 +181,10 @@
   let cropper = null;
   const originalImages = {}; // Store original images for undo
   const croppedImages = {};  // Store cropped images as DataURL
+  const saveStatus = {};     // Track per-image save status (for clean_local)
+
+  // Pass clean_local from Flask
+  const isCleanLocal = {{ 'true' if clean_local else 'false' }};
 
   window.onload = () => {
     updateModal();
@@ -162,10 +195,71 @@
     });
   };
 
-  function markDecision(isYes) {
+  async function markDecision(isYes) {
     selections[currentIndex] = isYes;
     const form = document.getElementById('imageForm');
     form.style.borderColor = isYes ? '#28a745' : '#dc3545';
+
+    if (isYes && isCleanLocal) {
+      // Save the image immediately
+      let filename = imageUrls[currentIndex].split('/').pop();
+      let croppedData = croppedImages[currentIndex] || null;
+
+      let payload = {
+        filename: filename,
+        cropped_data: croppedData || null
+      };
+
+      // If not cropped, send original image as base64
+      if (!croppedData) {
+        // Fetch the image as blob and convert to base64
+        const response = await fetch(imageUrls[currentIndex]);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = async function() {
+          payload.cropped_data = reader.result;
+          await saveCleanedImage(payload, currentIndex);
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        await saveCleanedImage(payload, currentIndex);
+      }
+    } 
+    else if (!isYes && isCleanLocal) {
+    // NEW: Delete file if it exists
+    let filename = imageUrls[currentIndex].split('/').pop();
+    await deleteCleanedImage(filename, currentIndex);
+    saveStatus[currentIndex] = 'skipped';
+    setTimeout(() => navigate(1), 300);
+      }
+    else if (isCleanLocal) {
+      saveStatus[currentIndex] = 'skipped';
+      setTimeout(() => navigate(1), 300);
+    
+    } 
+    else {
+      setTimeout(() => navigate(1), 300);
+    }
+  }
+
+  async function saveCleanedImage(payload, idx) {
+    try {
+      const res = await fetch('/save_cleaned_image', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        saveStatus[idx] = 'saved';
+      } else {
+        saveStatus[idx] = 'error';
+        alert('Failed to save image: ' + result.message);
+      }
+    } catch (e) {
+      saveStatus[idx] = 'error';
+      alert('Error saving image: ' + e.message);
+    }
     setTimeout(() => navigate(1), 300);
   }
 
@@ -200,20 +294,40 @@
         cropper = null;
         removeConfirmCropBtn();
         removeUndoCropBtn();
+        removeCropperControls();
       }
     } else {
       form.style.borderColor = 'transparent';
       generateSelectedInputs();
       generateCroppedInputs();
+
+      // If clean_local, show only success message and upload again button
+      if (isCleanLocal) {
+        document.getElementById('finalSlide').innerHTML = `
+          <h4 class="mb-4 text-success">✅ Successfully saved all images!</h4>
+          <button class="btn btn-primary" onclick="window.location.href='{{ url_for('index') }}'">Upload Again</button>
+        `;
+      }
     }
   }
 
   function navigate(dir) {
-    currentIndex += dir;
-    if (currentIndex < 0) currentIndex = 0;
-    if (currentIndex > imageUrls.length) currentIndex = imageUrls.length;
+  // Only allow navigation within valid range (including final slide)
+  const maxIndex = imageUrls.length; // final slide index
+  const minIndex = 0;
+  let nextIndex = currentIndex + dir;
+
+  // Clamp to valid range
+  if (nextIndex < minIndex) nextIndex = minIndex;
+  if (nextIndex > maxIndex) nextIndex = maxIndex;
+
+  // Only update if actually moving
+  if (nextIndex !== currentIndex) {
+    currentIndex = nextIndex;
     updateModal();
   }
+}
+
 
   function generateSelectedInputs() {
     const container = document.getElementById('hiddenInputs');
@@ -229,11 +343,8 @@
     }
   }
 
-  // Add this function to generate hidden cropped image inputs for submission
   function generateCroppedInputs() {
-    // Remove old cropped inputs
     document.querySelectorAll('input[name^="cropped_image_data_"]').forEach(el => el.remove());
-    // Only add cropped inputs for selected images, and keep the index in selected_images order
     let selectedIdx = 0;
     for (let i = 0; i < imageUrls.length; i++) {
       if (selections[i]) {
@@ -265,7 +376,7 @@
       cropper = null;
       removeConfirmCropBtn();
       removeUndoCropBtn();
-      removeCropperControls(); // <-- Ensure controls are removed before adding
+      removeCropperControls();
     }
     cropper = new Cropper(img, {
       viewMode: 0,
@@ -279,7 +390,7 @@
       ready() {
         addConfirmCropBtn();
         addUndoCropBtn();
-        addCropperControls(); // <-- Only add controls here
+        addCropperControls();
         const cropperContainer = document.querySelector('.cropper-container');
         if (cropperContainer) {
           cropperContainer.style.maxHeight = '70vh';
@@ -383,7 +494,7 @@
     }
     removeConfirmCropBtn();
     removeUndoCropBtn();
-    removeCropperControls(); // <-- Remove controls after undo
+    removeCropperControls();
     const form = document.getElementById('imageForm');
     form.classList.remove('cropper-mode');
     document.getElementById('cropMsg').style.display = 'none';
@@ -396,13 +507,11 @@
   function confirmCrop() {
     if (cropper) {
       const canvas = cropper.getCroppedCanvas({
-        // Resize the cropped image to a max width/height (e.g., 800px)
         maxWidth: 800,
         maxHeight: 800,
         imageSmoothingQuality: 'high'
       });
       if (canvas) {
-        // Compress to JPEG with quality 0.7 (adjust as needed)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         document.getElementById('modalImage').src = dataUrl;
         croppedImages[currentIndex] = dataUrl;
@@ -418,6 +527,31 @@
       document.getElementById('cropMsg').style.display = 'none';
     }
   }
+  if (isCleanLocal) {
+  document.getElementById('imageForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    return false;
+  });
+}
+async function deleteCleanedImage(filename, idx) {
+  try {
+    const res = await fetch('/delete_cleaned_image', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({filename: filename})
+    });
+    const result = await res.json();
+    if (result.status === 'success' || result.status === 'not_found') {
+      saveStatus[idx] = 'deleted';
+    } else {
+      saveStatus[idx] = 'error';
+      alert('Failed to delete image: ' + result.message);
+    }
+  } catch (e) {
+    saveStatus[idx] = 'error';
+    alert('Error deleting image: ' + e.message);
+  }
+}
 
 
 </script>

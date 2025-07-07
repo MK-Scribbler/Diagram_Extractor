@@ -1,6 +1,6 @@
 # img-scrapping-flask
 
-This project is a Flask web application that allows users to extract diagrams/images from a web URL or PDF file, preview the results, select images, and download them as a ZIP file. It uses a YOLO model for diagram detection and supports both web and PDF sources.
+This project is a Flask web application for extracting, previewing, cropping, and cleaning diagrams/images from a web URL, PDF file, or local images. It uses a YOLO model for diagram detection and supports cropping and cleaning workflows for dataset creation.
 
 ---
 
@@ -12,15 +12,28 @@ img-scrapping-flask/
 ├── best.pt               # YOLO model weights
 ├── requirements.txt      # Python dependencies
 ├── README.md             # Project documentation
-├── results/              # (Optional) Output/results directory
-├── runs/                 # (Optional) YOLO runs directory
-├── static/               # Static files (filtered images, etc.)
+├── results/              # Output/results directory for cleaned images
+├── static/
+│   ├── diagrams_web_filtered/      # Images filtered from web scraping
+│   ├── diagrams_pdf_filtered/      # Images filtered from PDF
+│   └── diagrams_folder_filtered/   # Images uploaded for cleaning
 ├── templates/
 │   ├── index.html        # Home/upload page
-│   └── preview.html      # Image preview/selection page
+│   └── preview.html      # Image preview/cropping/selection page
 ├── uploads/              # Uploaded files (PDFs, images)
 ├── venv/                 # Python virtual environment
 ```
+
+---
+
+## Features
+
+- **Extract images from a web URL** (with Selenium/Playwright support for dynamic sites).
+- **Extract diagrams from PDF files** (requires Poppler).
+- **Upload and clean local images** (multi-select supported).
+- **Preview and crop images** with Cropper.js before downloading.
+- **Download selected/cropped images** for dataset creation.
+- **Efficient cropping:** Cropped images are resized and compressed in-browser before upload to avoid large POST requests.
 
 ---
 
@@ -66,16 +79,17 @@ img-scrapping-flask/
 
 2. **Open your browser and go to:**
    ```
-   http://127.0.0.1:5000
+   http://127.0.0.1:8080
    ```
 
-3. **Choose to either:**
-   - Enter a web URL to extract diagrams from images on a webpage, or
-   - Upload a PDF file to extract diagrams from its pages.
+3. **Choose to:**
+   - Enter a web URL to extract diagrams from images on a webpage,
+   - Upload a PDF file to extract diagrams from its pages, or
+   - Select and upload multiple images for cropping/cleaning.
 
-4. **Preview the detected diagrams/images. Select the ones you want to download.**
+4. **Preview, crop, and select the images you want to keep.**
 
-5. **Download the selected images as a ZIP file.**
+5. **Download the selected/cropped images for your dataset.**
 
 ---
 
@@ -90,6 +104,8 @@ img-scrapping-flask/
 - ultralytics
 - shutil (standard library)
 - Poppler (external, for PDF support)
+- Cropper.js (frontend)
+- Selenium or Playwright (for advanced web scraping, optional)
 
 Install all Python dependencies using:
 ```sh
@@ -100,9 +116,11 @@ pip install -r requirements.txt
 
 ## Notes
 
-- Make sure you have the YOLO model weights (`best.pt`) in the project directory.
+- Cropped images are resized and compressed in-browser to avoid large uploads and 413 errors.
+- If you encounter "Request Entity Too Large", try cropping smaller areas or fewer images.
 - For PDF extraction, Poppler must be installed and the path set correctly in `app.py`.
 - The application creates and manages folders for uploads and filtered images automatically.
+- For web scraping, Playwright is recommended for dynamic sites (see documentation for usage).
 
 ---
 

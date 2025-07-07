@@ -101,17 +101,34 @@ def scrape_images():
             return best[0]
         return tag.get("data-src") or tag.get("src")
 
+    def is_logo_or_irrelevant(src):
+        # Filter by keywords
+        logo_keywords = ['logo', 'icon', 'sprite', 'favicon', 'avatar', 'profile', 'thumb', 'placeholder']
+        if any(word in src.lower() for word in logo_keywords):
+            return True
+        return False
+
     image_urls = []
     for tag in img_tags:
         src = get_best_src(tag)
         if src:
             full_url = urljoin(url, src.strip())
+            # Skip logos and irrelevant images by URL
+            if is_logo_or_irrelevant(full_url):
+                continue
             image_urls.append(full_url)
 
     count = 1
     for img_url in image_urls:
         try:
             img_data = requests.get(img_url, timeout=5).content
+            # Check image size (skip very small images, e.g., logos)
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(img_data))
+            w, h = img.size
+            if w < 80 or h < 80:  # Skip small images (likely logos/icons)
+                continue
             ext = os.path.splitext(urlparse(img_url).path)[-1] or ".jpg"
             out_path = os.path.join(WEB_OUTPUT_FOLDER, f"{count}{ext}")
             with open(out_path, "wb") as f:
@@ -202,6 +219,38 @@ def download_selected():
     if not selected:
         return render_template("message.html", status="error", message="⚠️ No images selected for download.", redirect_url=url_for('index'))
 
+    # If coming from data clean block, save to E:\Cleaned data with original names
+    if request.form.get('clean_local'):
+        extracted_dir = r'E:\Cleaned data'
+        os.makedirs(extracted_dir, exist_ok=True)
+        added = False
+        for idx, relative_path in enumerate(selected):
+            src = os.path.join('static', relative_path)
+            original_name = os.path.basename(relative_path)
+            dst = os.path.join(extracted_dir, original_name)
+
+            cropped_key = f"cropped_image_data_{idx}"
+            cropped_data = request.form.get(cropped_key)
+            if cropped_data and cropped_data.startswith("data:image"):
+                header, encoded = cropped_data.split(",", 1)
+                img_bytes = base64.b64decode(encoded)
+                with open(dst, "wb") as f:
+                    f.write(img_bytes)
+                added = True
+                continue
+
+            if os.path.abspath(src) == os.path.abspath(dst):
+                continue
+            if os.path.exists(src):
+                shutil.copyfile(src, dst)
+                added = True
+
+        if not added:
+            return render_template("message.html", status="error", message="⚠️ No valid images found to copy.", redirect_url=url_for('index'))
+
+        return render_template("message.html", status="success", message="✅ Selected images saved with original names in Cleaned data!", redirect_url=url_for('index'))
+
+    # --- Default behavior for web/pdf ---
     extracted_dir = os.path.join('results', 'Diagrams_Extracted')
     os.makedirs(extracted_dir, exist_ok=True)
 
@@ -252,37 +301,21 @@ def upload_folder():
     if not files:
         return redirect(url_for('index'))
 
-    # Clean and prepare a folder for these images
     FOLDER_UPLOAD_OUTPUT = 'static/diagrams_folder_filtered'
     shutil.rmtree(FOLDER_UPLOAD_OUTPUT, ignore_errors=True)
     os.makedirs(FOLDER_UPLOAD_OUTPUT, exist_ok=True)
 
-    count = 1
     for file in files:
         filename = file.filename
         ext = os.path.splitext(filename)[-1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']:
-            out_path = os.path.join(FOLDER_UPLOAD_OUTPUT, f"{count}{ext}")
+            out_path = os.path.join(FOLDER_UPLOAD_OUTPUT, filename)
             file.save(out_path)
-            count += 1
 
-    # Prepare image URLs for preview.html
     image_urls = [url_for('static', filename=f'diagrams_folder_filtered/{img}') for img in sorted(os.listdir(FOLDER_UPLOAD_OUTPUT))]
-    return render_template('preview.html', image_urls=image_urls)
+    # Pass clean_local=True to preview.html
+    return render_template('preview.html', image_urls=image_urls, clean_local=True)
 
-@app.route('/test_upload', methods=['GET', 'POST'])
-def test_upload():
-    if request.method == 'POST':
-        files = request.files.getlist('images')
-        total_size = sum(len(file.read()) for file in files)
-        print("Total upload size:", total_size)
-        return f"Received {len(files)} files, total size: {total_size} bytes"
-    return '''
-    <form method="post" enctype="multipart/form-data">
-      <input type="file" name="images" webkitdirectory directory multiple>
-      <button type="submit">Upload</button>
-    </form>
-    '''
 
 if __name__ == '__main__':
-    app.run(debug=True,port=8080)
+    app.run(port=8080)

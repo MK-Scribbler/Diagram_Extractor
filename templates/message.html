@@ -50,7 +50,7 @@
 </head>
 <body>
   <div class="card {{ status }}">
-    <h2>{{ "Success!" if status == 'success' else "Oops!" }}</h2>
+    <h2>{{ "Success!" if status == 'success' else "Sorry" }}</h2>
     <p>{{ message }}</p>
     <a href="{{ redirect_url }}" class="btn btn-primary">Upload Again</a>
   </div>

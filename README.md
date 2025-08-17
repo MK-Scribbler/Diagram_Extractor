@@ -1,4 +1,4 @@
-# img-scrapping-flask
+# Diagram Scrapper
 
 This project is a Flask web application for extracting, previewing, cropping, and cleaning diagrams/images from a web URL, PDF file, or local images. It uses a YOLO model for diagram detection and supports cropping and cleaning workflows for dataset creation.
 

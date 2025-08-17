@@ -208,9 +208,9 @@ def upload_pdf():
             count += 1
 
         os.remove(page_path)
-
+        sources=[]
     image_urls = [url_for('static', filename=f'diagrams_pdf_filtered/{img}') for img in sorted(os.listdir(PDF_OUTPUT_FOLDER))]
-    return render_template('preview.html', image_urls=image_urls)
+    return render_template('preview.html', image_urls=image_urls,sources=sources)
 
 
 @app.route('/download_selected', methods=['POST'])
@@ -318,4 +318,4 @@ def upload_folder():
 
 
 if __name__ == '__main__':
-    app.run(port=8080)
+    app.run(port=5000)

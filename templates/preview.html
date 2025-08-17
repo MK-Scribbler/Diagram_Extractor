@@ -149,11 +149,15 @@
 
         <!-- Final Slide -->
         <div id="finalSlide">
-          <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
-          <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
-          <div id="hiddenInputs"></div>
           {% if not clean_local %}
-          <button type="submit" class="btn btn-primary" id="submitBtn">Submit Selected Images</button>
+            <h4 class="mb-4 text-success">All images processed!</h4>
+            <p class="text-muted mb-4">Selected images have been saved to the 'results/Diagrams_Extracted' folder.</p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">Go Back</a>
+          {% else %}
+            <h4 class="mb-4 text-success">Done With Finalizing The Images</h4>
+            <p class="text-muted mb-4">Click submit to finalize and download the selected diagrams.</p>
+            <div id="hiddenInputs"></div>
+            <button type="submit" class="btn btn-primary" id="submitBtn">Submit Selected Images</button>
           {% endif %}
         </div>
 
@@ -176,6 +180,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
   const imageUrls = {{ image_urls | tojson | safe }};
+  const sources = {{ sources | tojson | safe }};
   const selections = {};
   let currentIndex = 0;
   let cropper = null;
@@ -200,45 +205,66 @@
     const form = document.getElementById('imageForm');
     form.style.borderColor = isYes ? '#28a745' : '#dc3545';
 
-    if (isYes && isCleanLocal) {
-      // Save the image immediately
-      let filename = imageUrls[currentIndex].split('/').pop();
-      let croppedData = croppedImages[currentIndex] || null;
+    if (isYes) {
+        if (isCleanLocal) {
+            // Existing logic for "Upload Folder"
+            let filename = imageUrls[currentIndex].split('/').pop();
+            let croppedData = croppedImages[currentIndex] || null;
+            let payload = { filename: filename, cropped_data: croppedData };
 
-      let payload = {
-        filename: filename,
-        cropped_data: croppedData || null
-      };
+            if (!croppedData) {
+                const response = await fetch(imageUrls[currentIndex]);
+                const blob = await response.blob();
+                const reader = new FileReader();
+                reader.onloadend = async function() {
+                    payload.cropped_data = reader.result;
+                    await saveCleanedImage(payload, currentIndex);
+                };
+                reader.readAsDataURL(blob);
+            } else {
+                await saveCleanedImage(payload, currentIndex);
+            }
+        } else {
+            // New logic for URL/PDF: save immediately
+            await saveImage();
+            setTimeout(() => navigate(1), 300); // Navigate after saving
+        }
+    } else {
+        if (isCleanLocal) {
+            // Existing logic for "Upload Folder"
+            let filename = imageUrls[currentIndex].split('/').pop();
+            await deleteCleanedImage(filename, currentIndex);
+        }
+        // For all "No" clicks, just navigate
+        setTimeout(() => navigate(1), 300);
+    }
+  }
 
-      // If not cropped, send original image as base64
-      if (!croppedData) {
-        // Fetch the image as blob and convert to base64
-        const response = await fetch(imageUrls[currentIndex]);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = async function() {
-          payload.cropped_data = reader.result;
-          await saveCleanedImage(payload, currentIndex);
-        };
-        reader.readAsDataURL(blob);
-      } else {
-        await saveCleanedImage(payload, currentIndex);
-      }
-    } 
-    else if (!isYes && isCleanLocal) {
-    // NEW: Delete file if it exists
-    let filename = imageUrls[currentIndex].split('/').pop();
-    await deleteCleanedImage(filename, currentIndex);
-    saveStatus[currentIndex] = 'skipped';
-    setTimeout(() => navigate(1), 300);
-      }
-    else if (isCleanLocal) {
-      saveStatus[currentIndex] = 'skipped';
-      setTimeout(() => navigate(1), 300);
-    
-    } 
-    else {
-      setTimeout(() => navigate(1), 300);
+  async function saveImage() {
+    const imagePath = imageUrls[currentIndex];
+    const sourceUrl = sources[currentIndex] || 'N/A';
+    const croppedData = croppedImages[currentIndex] || null;
+
+    try {
+        const response = await fetch('/save_image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image_path: imagePath,
+                source: sourceUrl,
+                cropped_data: croppedData
+            })
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            console.log('Image saved:', result.message);
+        } else {
+            console.error('Failed to save image:', result.message);
+            alert('Failed to save image: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error saving image:', error);
+        alert('Error saving image: ' + error.message);
     }
   }
 
@@ -342,6 +368,24 @@
       }
     }
   }
+  function saveExtractedImage(idx, croppedData, ext, source) {
+    fetch('/save_extracted_image', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            cropped_data: croppedData, // for non-cropped pass original as data URL
+            ext: ext,
+            source: source
+        })
+    }).then(response => response.json())
+      .then(result => {
+        if(result.status === "success") {
+            document.getElementById('status_' + idx).innerText = "Saved!";
+        } else {
+            alert("Error: " + result.message);
+        }
+    });
+}
 
   function generateCroppedInputs() {
     document.querySelectorAll('input[name^="cropped_image_data_"]').forEach(el => el.remove());
